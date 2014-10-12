@@ -64,6 +64,9 @@ function geolocation_inner_custom_box() {
 		<input id="geolocation-load" type="button" class="button geolocationadd" value="Load" tabindex="3" />
 		<input type="hidden" id="geolocation-latitude" name="geolocation-latitude" />
 		<input type="hidden" id="geolocation-longitude" name="geolocation-longitude" />
+
+		<!-- by zn -->
+		<input type="hidden" id="geolocation-formatted_address" name="geolocation-formatted_address" />
 		<div id="geolocation-map" style="border:solid 1px #c6c6c6;width:265px;height:200px;margin-top:5px;"></div>
 		<div style="margin:5px 0 0 0;">
 			<input id="geolocation-public" name="geolocation-public" type="checkbox" value="1" />
@@ -110,17 +113,19 @@ function geolocation_save_postdata($post_id) {
 
   $latitude = clean_coordinate($_POST['geolocation-latitude']);
   $longitude = clean_coordinate($_POST['geolocation-longitude']);
+  $formatted_address = $_POST['geolocation-formatted_address'];
   $address = reverse_geocode($latitude, $longitude);
   $public = $_POST['geolocation-public'];
   $on = $_POST['geolocation-on'];
   
   if((clean_coordinate($latitude) != '') && (clean_coordinate($longitude)) != '') {
   	update_post_meta($post_id, 'geo_latitude', $latitude);
-  	update_post_meta($post_id, 'geo_longitude', $longitude);
-  	
-  	if(esc_html($address) != '')
-  		update_post_meta($post_id, 'geo_address', $address);
-  		
+      update_post_meta($post_id, 'geo_longitude', $longitude);
+      update_post_meta($post_id, 'geo_formatted_address', $formatted_address);
+
+      if(esc_html($address) != '')
+          update_post_meta($post_id, 'geo_address', $address);
+
   	if($on) {
   		update_post_meta($post_id, 'geo_enabled', 1);
   		
@@ -161,6 +166,7 @@ function admin_head() {
 					var center = new google.maps.LatLng(0.0,0.0);
 					var postLatitude =  '<?php echo esc_js(get_post_meta($post_id, 'geo_latitude', true)); ?>';
 					var postLongitude =  '<?php echo esc_js(get_post_meta($post_id, 'geo_longitude', true)); ?>';
+                    var postFormattedAddress = '<?php echo esc_js(get_post_meta($post_id, 'geo_formatted_address', true)); ?>';
 					var public = '<?php echo get_post_meta($post_id, 'geo_public', true); ?>';
 					var on = '<?php echo get_post_meta($post_id, 'geo_enabled', true); ?>';
 					
@@ -179,6 +185,7 @@ function admin_head() {
 						hasLocation = true;
 						$j("#geolocation-latitude").val(center.lat());
 						$j("#geolocation-longitude").val(center.lng());
+                        $j("#geolocation-formatted_address").val(postFormattedAddress);
 						reverseGeocode(center);
 					}
 						
@@ -262,6 +269,8 @@ function admin_head() {
 							geocoder.geocode({"address": address}, function(results, status) {
 								if (status == google.maps.GeocoderStatus.OK) {
 									placeMarker(results[0].geometry.location);
+                                    // by zn
+                                    $j("#geolocation-formatted_address").val(results[0].formatted_address);
 									if(!hasLocation) {
 								    	map.setZoom(16);
 								    	hasLocation = true;
@@ -468,16 +477,19 @@ function display_location($content)  {
 	$longitude = clean_coordinate(get_post_meta($post->ID, 'geo_longitude', true));
 	$address = get_post_meta($post->ID, 'geo_address', true);
 	$public = (bool)get_post_meta($post->ID, 'geo_public', true);
-	
+
+    $formatted_address = get_post_meta($post->ID, 'geo_formatted_address', true);
+
 	$on = true;
-	if(get_post_meta($post->ID, 'geo_enabled', true) != '')
-		$on = (bool)get_post_meta($post->ID, 'geo_enabled', true);
-	
+	if(get_post_meta($post->ID, 'geo_enabled', true) != '') {
+        $on = (bool)get_post_meta($post->ID, 'geo_enabled', true);
+    }
+
 	if(empty($address))
 		$address = reverse_geocode($latitude, $longitude);
 	
 	if((!empty($latitude)) && (!empty($longitude) && ($public == true) && ($on == true))) {
-		$html = '<a class="geolocation-link" href="#" id="geolocation'.$post->ID.'" name="'.$latitude.','.$longitude.'" onclick="return false;">Posted from '.esc_html($address).'.</a>';
+		$html = '<a class="geolocation-link" href="#" id="geolocation'.$post->ID.'" name="'.$latitude.','.$longitude.'" onclick="return false;">'.esc_html($formatted_address).'.</a>';
 		switch(esc_attr(get_option('geolocation_map_position')))
 		{
 			case 'before':
